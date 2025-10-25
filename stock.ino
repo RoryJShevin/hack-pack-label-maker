@@ -42,59 +42,31 @@
 #pragma endregion LIBRARIES
 
 //////////////////////////////////////////////////
-          //  PINS AND PARAMETERS  //
+          //  HARDWARE SETUP AND PARAMS  //
 //////////////////////////////////////////////////
-#pragma region PINS AND PARAMS
+#pragma region HARDWARE SETUP
 
+// LCD setup
 LiquidCrystal_I2C lcd(0x27, 16, 2);  // Set the LCD address to 0x27 for a 16x2 display
 
-ezButton button1(14); //joystick button handler
-#define INIT_MSG "Initializing..." // Text to display on startup
-#define MODE_NAME "   LABELMAKER   " //these are variables for the text which is displayed in different menus. 
-#define PRINT_CONF "  PRINT LABEL?  " //try changing these, or making new ones and adding conditions for when they are used
-#define PRINTING "    PRINTING    " // NOTE: this text must be 16 characters or LESS in order to fit on the screen correctly
-#define MENU_CLEAR ":                " //this one clears the menu for editing
-
-
-//text variables
-int x_scale = 230;//these are multiplied against the stored coordinate (between 0 and 4) to get the actual number of steps moved
-int y_scale = 230;//for example, if this is 230(default), then 230(scale) x 4(max coordinate) = 920 (motor steps)
-int scale = x_scale;
-int space = x_scale * 5; //space size between letters (as steps) based on X scale in order to match letter width
-//multiplied by 5 because the scale variables are multiplied against coordinates later, while space is just fed in directly, so it needs to be scaled up by 5 to match
-
-
 // Joystick setup
+ezButton button1(14); //joystick button handler
 const int joystickXPin = A2;  // Connect the joystick X-axis to this analog pin
 const int joystickYPin = A1;  // Connect the joystick Y-axis to this analog pin
 const int joystickButtonThreshold = 200;  // Adjust this threshold value based on your joystick
 
-// Menu parameters
-const char alphabet[] = "_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?,.#@"; //alphabet menu
-int alphabetSize = sizeof(alphabet) - 1;
-String text;  // Store the label text
-
-int currentCharacter = 0; //keep track of which character is currently displayed under the cursor
-int cursorPosition = 0; //keeps track of the cursor position (left to right) on the screen
-int currentPage = 0; //keeps track of the current page for menus
-const int charactersPerPage = 16; //number of characters that can fit on one row of the screen
-
-// Stepper motor parameters
-const int stepCount = 200;
+// Stepper motor setup
 const int stepsPerRevolution = 2048;
+int xStepperPins[4] = {6, 8, 7, 9};  // pins for x-motor coils
+int yStepperPins[4] = {2, 4, 3, 5};  // pins for y-motor coils
 
-// initialize the stepper library for both steppers:
-Stepper xStepper(stepsPerRevolution, 6, 8, 7, 9);
-Stepper yStepper(stepsPerRevolution, 2, 4, 3, 5); 
+Stepper xStepper = makeStepper(stepsPerRevolution, xStepperPins[0], xStepperPins[1], xStepperPins[2], xStepperPins[3]);
+Stepper yStepper = makeStepper(stepsPerRevolution, yStepperPins[0], yStepperPins[1], yStepperPins[2], yStepperPins[3]);
 
-int xPins[4] = {6, 8, 7, 9};  // pins for x-motor coils
-int yPins[4] = {2, 4, 3, 5};    // pins for y-motor coils
-
-//Servo
-const int SERVO_PIN  = 13;
+// Servo Setup
 Servo servo;
-int angle = 30; // the current angle of servo motor
-
+const int SERVO_PIN  = 13;
+int servo_angle = 30; // the current angle of servo motor
 
 // Creates states to store what the current menu and joystick states are
 // Decoupling the state from other functions is good because it means the sensor / screen aren't hardcoded into every single action and can be handled at a higher level
@@ -121,6 +93,38 @@ bool joyRight;
 int button1State;
 int joystickX;
 int joystickY;
+
+#pragma endregion HARDWARE SETUP
+
+
+#define INIT_MSG "Initializing..." // Text to display on startup
+#define MODE_NAME "   LABELMAKER   " // these are variables for the text which is displayed in different menus. 
+#define PRINT_CONF "  PRINT LABEL?  " // try changing these, or making new ones and adding conditions for when they are used
+#define PRINTING "    PRINTING    " // NOTE: this text must be 16 characters or LESS in order to fit on the screen correctly
+#define MENU_CLEAR ":                " // this one clears the menu for editing
+
+
+// text variables, TODO: clean this up
+int letter_size = 920 // max height and width in units of motor steps
+// int letter_resolution = 5 // grainularity of points to 
+// int step_size = 230;
+// int x_scale = 230;//these are multiplied against the stored coordinate (between 0 and 4) to get the actual number of steps moved
+// int y_scale = 230;//for example, if this is 230(default), then 230(scale) x 4(max coordinate) = 920 (motor steps)
+// int scale = x_scale;
+// int space = x_scale * 5; //space size between letters (as steps) based on X scale in order to match letter width
+//multiplied by 5 because the scale variables are multiplied against coordinates later, while space is just fed in directly, so it needs to be scaled up by 5 to match
+
+
+// Menu parameters
+const char alphabet[] = "_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?,.#@"; //alphabet menu
+int alphabetSize = sizeof(alphabet) - 1;
+String text;  // Store the label text
+
+int currentCharacter = 0; //keep track of which character is currently displayed under the cursor
+int cursorPosition = 0; //keeps track of the cursor position (left to right) on the screen
+int currentPage = 0; //keeps track of the current page for menus
+const int charactersPerPage = 16; //number of characters that can fit on one row of the screen
+
 #pragma endregion PINS AND PARAMS
 
 //////////////////////////////////////////////////
@@ -221,7 +225,7 @@ void setup() {
   button1.setDebounceTime(50);  //debounce prevents the joystick button from triggering twice when clicked
 
   servo.attach(SERVO_PIN);  // attaches the servo on pin 9 to the servo object
-  servo.write(angle);
+  servo.write(servo_angle);
 
   plot(false);  //servo to tape surface so pen can be inserted
 
@@ -613,9 +617,9 @@ void line(int newx, int newy, bool drawing) {
 
   if (drawing < 2) {  //checks if we should be drawing and puts the pen up or down based on that.
     plot(drawing);    // dashed: 0= don't draw / 1=draw / 2... = draw dashed with variable dash width
-  } else {
-    plot((stepCount / drawing) % 2);  //can do dashed lines, but for now this isn't doing anything since we're only sending 0 or 1.
-  }
+  // } else { TODO: Remove this?
+  //   plot((stepCount / drawing) % 2);  //can do dashed lines, but for now this isn't doing anything since we're only sending 0 or 1.
+  // }
 
   int i;
   long over = 0;
@@ -675,11 +679,11 @@ void line(int newx, int newy, bool drawing) {
 
 void plot(boolean penOnPaper) {  //used to handle lifting or lowering the pen on to the tape
   if (penOnPaper) {              //if the pen is already up, put it down
-    angle = 80;
+    servo_angle = 80;
   } else {  //if down, then lift up.
-    angle = 25;
+    servo_angle = 25;
   }
-  servo.write(angle);                        //actuate the servo to either position.
+  servo.write(servo_angle);                        //actuate the servo to either position.
   if (penOnPaper != pPenOnPaper) delay(50);  //gives the servo time to move before jumping into the next action
   pPenOnPaper = penOnPaper;                  //store the previous state.
 }
@@ -694,8 +698,8 @@ void penDown() {  //singular command to put the pen down
 
 void releaseMotors() {
   for (int i = 0; i < 4; i++) {  //deactivates all the motor coils
-    digitalWrite(xPins[i], 0);   //just picks each motor pin and send 0 voltage
-    digitalWrite(yPins[i], 0);
+    digitalWrite(xStepperPins[i], 0);   //just picks each motor pin and send 0 voltage
+    digitalWrite(yStepperPins[i], 0);
   }
   plot(false);
 }
