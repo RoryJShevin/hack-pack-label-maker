@@ -57,12 +57,10 @@ ezButton button1(14); //joystick button handler
 
 
 //text variables
-int x_scale = 230;//these are multiplied against the stored coordinate (between 0 and 4) to get the actual number of steps moved
-int y_scale = 230;//for example, if this is 230(default), then 230(scale) x 4(max coordinate) = 920 (motor steps)
-int scale = x_scale;
-int space = x_scale * 5; //space size between letters (as steps) based on X scale in order to match letter width
-//multiplied by 5 because the scale variables are multiplied against coordinates later, while space is just fed in directly, so it needs to be scaled up by 5 to match
-
+int letter_size = 930; // default letter size
+int resolution = 5; // default resolution (0-4)
+int step_size = 930 / (resolution - 1); // step size based on resolution, multiplied against coordinates to get actual steps moved
+int space = letter_size * 5 / 4; //space size between letters (as steps) based on letter size in order to match letter width
 
 // Joystick setup
 const int joystickXPin = A2;  // Connect the joystick X-axis to this analog pin
@@ -455,9 +453,9 @@ void plotText(String &str, int x, int y) {  //takes in our label as a string, an
         pos += space;
       } else {
         plotCharacter(c, x + pos, y);
-        pos += space;  //scale is multiplied by 4 here to convert it to steps (because it normally get's multiplied by a coordinate with a max of 4)
-        if (c == 'I' || c == 'i') pos -= (scale * 4) / 1.1;
-        if (c == ',') pos -= (scale * 4) / 1.2;
+        pos += space;
+        if (c == 'I' || c == 'i') pos -= (step_size * 4) / 1.1; // TODO: Deal with magic numbers
+        if (c == ',') pos -= (step_size * 4) / 1.2;
       }
     }
   }
@@ -583,14 +581,14 @@ void plotCharacter(char c, int x, int y) {  //this receives info from plotText f
 
       // 1: Normalize
       int x_start = x;
-      int x_end = x + cx * x_scale;
+      int x_end = x + cx * step_size;
       int y_start = y;
-      int y_end = y + cy * y_scale * 3.5;  //we multiply by 3.5 here to equalize the Y output to match X,
+      int y_end = y + cy * step_size * 3.5;  //we multiply by 3.5 here to equalize the Y output to match X,
       //this is because the Y lead screw covers less distance per-step than the X motor wheel (about 3.5 times less haha)
       bool switched = false;
 
-      Serial.print("Scale: ");
-      Serial.print(scale);
+      Serial.print("Step Size: ");
+      Serial.print(step_size);
       Serial.print("  ");
       Serial.print("X Goal: ");
       Serial.print(x_end);
